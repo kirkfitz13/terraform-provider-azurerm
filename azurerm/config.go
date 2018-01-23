@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/arm/automation"
-	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/azure-sdk-for-go/arm/cosmos-db"
 	"github.com/Azure/azure-sdk-for-go/arm/disk"
 	"github.com/Azure/azure-sdk-for-go/arm/keyvault"
@@ -19,6 +18,7 @@ import (
 	appinsights "github.com/Azure/azure-sdk-for-go/services/appinsights/mgmt/2015-05-01/insights"
 	"github.com/Azure/azure-sdk-for-go/services/authorization/mgmt/2015-07-01/authorization"
 	"github.com/Azure/azure-sdk-for-go/services/cdn/mgmt/2017-04-02/cdn"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-03-30/compute"
 	"github.com/Azure/azure-sdk-for-go/services/containerinstance/mgmt/2017-08-01-preview/containerinstance"
 	"github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2017-10-01/containerregistry"
 	"github.com/Azure/azure-sdk-for-go/services/containerservice/mgmt/2017-09-30/containerservice"
@@ -61,15 +61,6 @@ type ArmClient struct {
 
 	StopContext context.Context
 
-	availSetClient         compute.AvailabilitySetsClient
-	usageOpsClient         compute.UsageClient
-	vmExtensionImageClient compute.VirtualMachineExtensionImagesClient
-	vmExtensionClient      compute.VirtualMachineExtensionsClient
-	vmScaleSetClient       compute.VirtualMachineScaleSetsClient
-	vmImageClient          compute.VirtualMachineImagesClient
-	vmClient               compute.VirtualMachinesClient
-	imageClient            compute.ImagesClient
-
 	diskClient                 disk.DisksClient
 	snapshotsClient            disk.SnapshotsClient
 	cosmosDBClient             cosmosdb.DatabaseAccountsClient
@@ -110,6 +101,16 @@ type ArmClient struct {
 	// CDN
 	cdnProfilesClient  cdn.ProfilesClient
 	cdnEndpointsClient cdn.EndpointsClient
+
+	// Compute
+	availSetClient         compute.AvailabilitySetsClient
+	imageClient            compute.ImagesClient
+	usageOpsClient         compute.UsageClient
+	vmExtensionImageClient compute.VirtualMachineExtensionImagesClient
+	vmExtensionClient      compute.VirtualMachineExtensionsClient
+	vmScaleSetClient       compute.VirtualMachineScaleSetsClient
+	vmImageClient          compute.VirtualMachineImagesClient
+	vmClient               compute.VirtualMachinesClient
 
 	// Databases
 	mysqlConfigurationsClient      mysql.ConfigurationsClient
@@ -316,57 +317,6 @@ func getArmClient(c *authentication.Config) (*ArmClient, error) {
 		return keyVaultSpt, nil
 	})
 
-	// NOTE: these declarations should be left separate for clarity should the
-	// clients be wished to be configured with custom Responders/PollingModes etc...
-	asc := compute.NewAvailabilitySetsClientWithBaseURI(endpoint, c.SubscriptionID)
-	setUserAgent(&asc.Client)
-	asc.Authorizer = auth
-	asc.Sender = sender
-	asc.SkipResourceProviderRegistration = c.SkipProviderRegistration
-	client.availSetClient = asc
-
-	uoc := compute.NewUsageClientWithBaseURI(endpoint, c.SubscriptionID)
-	setUserAgent(&uoc.Client)
-	uoc.Authorizer = auth
-	uoc.Sender = sender
-	uoc.SkipResourceProviderRegistration = c.SkipProviderRegistration
-	client.usageOpsClient = uoc
-
-	vmeic := compute.NewVirtualMachineExtensionImagesClientWithBaseURI(endpoint, c.SubscriptionID)
-	setUserAgent(&vmeic.Client)
-	vmeic.Authorizer = auth
-	vmeic.Sender = sender
-	vmeic.SkipResourceProviderRegistration = c.SkipProviderRegistration
-	client.vmExtensionImageClient = vmeic
-
-	vmec := compute.NewVirtualMachineExtensionsClientWithBaseURI(endpoint, c.SubscriptionID)
-	setUserAgent(&vmec.Client)
-	vmec.Authorizer = auth
-	vmec.Sender = sender
-	vmec.SkipResourceProviderRegistration = c.SkipProviderRegistration
-	client.vmExtensionClient = vmec
-
-	vmic := compute.NewVirtualMachineImagesClientWithBaseURI(endpoint, c.SubscriptionID)
-	setUserAgent(&vmic.Client)
-	vmic.Authorizer = auth
-	vmic.Sender = sender
-	vmic.SkipResourceProviderRegistration = c.SkipProviderRegistration
-	client.vmImageClient = vmic
-
-	vmssc := compute.NewVirtualMachineScaleSetsClientWithBaseURI(endpoint, c.SubscriptionID)
-	setUserAgent(&vmssc.Client)
-	vmssc.Authorizer = auth
-	vmssc.Sender = sender
-	vmssc.SkipResourceProviderRegistration = c.SkipProviderRegistration
-	client.vmScaleSetClient = vmssc
-
-	vmc := compute.NewVirtualMachinesClientWithBaseURI(endpoint, c.SubscriptionID)
-	setUserAgent(&vmc.Client)
-	vmc.Authorizer = auth
-	vmc.Sender = sender
-	vmc.SkipResourceProviderRegistration = c.SkipProviderRegistration
-	client.vmClient = vmc
-
 	csc := containerservice.NewContainerServicesClientWithBaseURI(endpoint, c.SubscriptionID)
 	setUserAgent(&csc.Client)
 	csc.Authorizer = auth
@@ -381,17 +331,109 @@ func getArmClient(c *authentication.Config) (*ArmClient, error) {
 	cdb.SkipResourceProviderRegistration = c.SkipProviderRegistration
 	client.cosmosDBClient = cdb
 
-	img := compute.NewImagesClientWithBaseURI(endpoint, c.SubscriptionID)
-	setUserAgent(&img.Client)
-	img.Authorizer = auth
-	img.Sender = sender
-	img.SkipResourceProviderRegistration = c.SkipProviderRegistration
-	client.imageClient = img
+	ifc := network.NewInterfacesClientWithBaseURI(endpoint, c.SubscriptionID)
+	setUserAgent(&ifc.Client)
+	ifc.Authorizer = auth
+	ifc.Sender = sender
+	ifc.SkipResourceProviderRegistration = c.SkipProviderRegistration
+	client.ifaceClient = ifc
 
-	client.registerAppInsightsClient(endpoint, c.SubscriptionID, auth, sender)
+	erc := network.NewExpressRouteCircuitsClientWithBaseURI(endpoint, c.SubscriptionID)
+	setUserAgent(&erc.Client)
+	erc.Authorizer = auth
+	erc.Sender = sender
+	erc.SkipResourceProviderRegistration = c.SkipProviderRegistration
+	client.expressRouteCircuitClient = erc
+
+	lbc := network.NewLoadBalancersClientWithBaseURI(endpoint, c.SubscriptionID)
+	setUserAgent(&lbc.Client)
+	lbc.Authorizer = auth
+	lbc.Sender = sender
+	lbc.SkipResourceProviderRegistration = c.SkipProviderRegistration
+	client.loadBalancerClient = lbc
+
+	lgc := network.NewLocalNetworkGatewaysClientWithBaseURI(endpoint, c.SubscriptionID)
+	setUserAgent(&lgc.Client)
+	lgc.Authorizer = auth
+	lgc.Sender = sender
+	lgc.SkipResourceProviderRegistration = c.SkipProviderRegistration
+	client.localNetConnClient = lgc
+
+	pipc := network.NewPublicIPAddressesClientWithBaseURI(endpoint, c.SubscriptionID)
+	setUserAgent(&pipc.Client)
+	pipc.Authorizer = auth
+	pipc.Sender = sender
+	pipc.SkipResourceProviderRegistration = c.SkipProviderRegistration
+	client.publicIPClient = pipc
+
+	sgc := network.NewSecurityGroupsClientWithBaseURI(endpoint, c.SubscriptionID)
+	setUserAgent(&sgc.Client)
+	sgc.Authorizer = auth
+	sgc.Sender = sender
+	sgc.SkipResourceProviderRegistration = c.SkipProviderRegistration
+	client.secGroupClient = sgc
+
+	src := network.NewSecurityRulesClientWithBaseURI(endpoint, c.SubscriptionID)
+	setUserAgent(&src.Client)
+	src.Authorizer = auth
+	src.Sender = sender
+	src.SkipResourceProviderRegistration = c.SkipProviderRegistration
+	client.secRuleClient = src
+
+	snc := network.NewSubnetsClientWithBaseURI(endpoint, c.SubscriptionID)
+	setUserAgent(&snc.Client)
+	snc.Authorizer = auth
+	snc.Sender = sender
+	snc.SkipResourceProviderRegistration = c.SkipProviderRegistration
+	client.subnetClient = snc
+
+	vgcc := network.NewVirtualNetworkGatewayConnectionsClientWithBaseURI(endpoint, c.SubscriptionID)
+	setUserAgent(&vgcc.Client)
+	vgcc.Authorizer = auth
+	vgcc.Sender = sender
+	vgcc.SkipResourceProviderRegistration = c.SkipProviderRegistration
+	client.vnetGatewayConnectionsClient = vgcc
+
+	vgc := network.NewVirtualNetworkGatewaysClientWithBaseURI(endpoint, c.SubscriptionID)
+	setUserAgent(&vgc.Client)
+	vgc.Authorizer = auth
+	vgc.Sender = sender
+	vgc.SkipResourceProviderRegistration = c.SkipProviderRegistration
+	client.vnetGatewayClient = vgc
+
+	vnc := network.NewVirtualNetworksClientWithBaseURI(endpoint, c.SubscriptionID)
+	setUserAgent(&vnc.Client)
+	vnc.Authorizer = auth
+	vnc.Sender = sender
+	vnc.SkipResourceProviderRegistration = c.SkipProviderRegistration
+	client.vnetClient = vnc
+
+	vnpc := network.NewVirtualNetworkPeeringsClientWithBaseURI(endpoint, c.SubscriptionID)
+	setUserAgent(&vnpc.Client)
+	vnpc.Authorizer = auth
+	vnpc.Sender = sender
+	vnpc.SkipResourceProviderRegistration = c.SkipProviderRegistration
+	client.vnetPeeringsClient = vnpc
+
+	rtc := network.NewRouteTablesClientWithBaseURI(endpoint, c.SubscriptionID)
+	setUserAgent(&rtc.Client)
+	rtc.Authorizer = auth
+	rtc.Sender = sender
+	rtc.SkipResourceProviderRegistration = c.SkipProviderRegistration
+	client.routeTablesClient = rtc
+
+	rc := network.NewRoutesClientWithBaseURI(endpoint, c.SubscriptionID)
+	setUserAgent(&rc.Client)
+	rc.Authorizer = auth
+	rc.Sender = sender
+	rc.SkipResourceProviderRegistration = c.SkipProviderRegistration
+	client.routesClient = rc
+
+	client.registerAppInsightsClients(endpoint, c.SubscriptionID, auth, sender)
 	client.registerAutomationClients(endpoint, c.SubscriptionID, auth, sender)
 	client.registerAuthentication(endpoint, graphEndpoint, c.SubscriptionID, c.TenantID, auth, graphAuth, sender)
 	client.registerCDNClients(endpoint, c.SubscriptionID, auth, sender)
+	client.registerComputeClients(endpoint, c.SubscriptionID, auth, sender)
 	client.registerContainerInstanceClients(endpoint, c.SubscriptionID, auth, sender)
 	client.registerContainerRegistryClients(endpoint, c.SubscriptionID, auth, sender)
 	client.registerDatabases(endpoint, c.SubscriptionID, auth, sender)
@@ -413,7 +455,7 @@ func getArmClient(c *authentication.Config) (*ArmClient, error) {
 	return &client, nil
 }
 
-func (c *ArmClient) registerAppInsightsClient(endpoint, subscriptionId string, auth autorest.Authorizer, sender autorest.Sender) {
+func (c *ArmClient) registerAppInsightsClients(endpoint, subscriptionId string, auth autorest.Authorizer, sender autorest.Sender) {
 	ai := appinsights.NewComponentsClientWithBaseURI(endpoint, subscriptionId)
 	setUserAgent(&ai.Client)
 	ai.Authorizer = auth
@@ -489,6 +531,40 @@ func (c *ArmClient) registerCDNClients(endpoint, subscriptionId string, auth aut
 	profilesClient.Sender = sender
 	profilesClient.SkipResourceProviderRegistration = c.skipProviderRegistration
 	c.cdnProfilesClient = profilesClient
+}
+
+func (c *ArmClient) registerComputeClients(endpoint, subscriptionId string, auth autorest.Authorizer, sender autorest.Sender) {
+	availabilitySetsClient := compute.NewAvailabilitySetsClientWithBaseURI(endpoint, subscriptionId)
+	c.configureClient(&availabilitySetsClient.Client, auth)
+	c.availSetClient = availabilitySetsClient
+
+	imagesClient := compute.NewImagesClientWithBaseURI(endpoint, subscriptionId)
+	c.configureClient(&imagesClient.Client, auth)
+	c.imageClient = imagesClient
+
+	usageClient := compute.NewUsageClientWithBaseURI(endpoint, subscriptionId)
+	c.configureClient(&usageClient.Client, auth)
+	c.usageOpsClient = usageClient
+
+	extensionImagesClient := compute.NewVirtualMachineExtensionImagesClientWithBaseURI(endpoint, subscriptionId)
+	c.configureClient(&extensionImagesClient.Client, auth)
+	c.vmExtensionImageClient = extensionImagesClient
+
+	extensionsClient := compute.NewVirtualMachineExtensionsClientWithBaseURI(endpoint, subscriptionId)
+	c.configureClient(&extensionsClient.Client, auth)
+	c.vmExtensionClient = extensionsClient
+
+	virtualMachineImagesClient := compute.NewVirtualMachineImagesClientWithBaseURI(endpoint, subscriptionId)
+	c.configureClient(&virtualMachineImagesClient.Client, auth)
+	c.vmImageClient = virtualMachineImagesClient
+
+	scaleSetsClient := compute.NewVirtualMachineScaleSetsClientWithBaseURI(endpoint, subscriptionId)
+	c.configureClient(&scaleSetsClient.Client, auth)
+	c.vmScaleSetClient = scaleSetsClient
+
+	virtualMachinesClient := compute.NewVirtualMachinesClientWithBaseURI(endpoint, subscriptionId)
+	c.configureClient(&virtualMachinesClient.Client, auth)
+	c.vmClient = virtualMachinesClient
 }
 
 func (c *ArmClient) registerContainerInstanceClients(endpoint, subscriptionId string, auth autorest.Authorizer, sender autorest.Sender) {
